@@ -1,3 +1,8 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text.Json;
+
 namespace csharp_basic;
 
 public class Library
@@ -6,63 +11,99 @@ public class Library
 
     public void AddBook(Book book)
     {
+        // Проверка ISBN
+        if (_books.Any(b => b.Isbn == book.Isbn))
+        {
+            Console.WriteLine("Книга с таким ISBN уже существует.");
+            return;
+        }
+
+        // Проверка дубликата (Автор + Название + Год)
+        if (_books.Any(b => b.Title == book.Title && b.Author == book.Author && b.Year == book.Year))
+        {
+            Console.WriteLine("Такая книга уже есть (Автор+Название+Год).");
+            return;
+        }
+
         _books.Add(book);
         Console.WriteLine($"Книга \"{book.Title}\" добавлена в библиотеку.");
     }
 
-    // Удаление по объекту
-    public bool RemoveBook(Book book) => _books.Remove(book);
-
-    // Удаление по ISBN
-    public bool RemoveBook(string isbn)
-    {
-        var found = _books.Find(b => string.Equals(b.Isbn, isbn, StringComparison.OrdinalIgnoreCase));
-        if (found is null) return false;
-        _books.Remove(found);
-        return true;
-    }
-
-    // Показать все книги
     public void ShowBooks()
     {
-        ShowBooks(_books);
-    }
-
-    // Универсальный вывод списка книг
-    public void ShowBooks(IEnumerable<Book> books)
-    {
-        var list = books.ToList();
-        if (list.Count == 0)
+        if (_books.Count == 0)
         {
-            Console.WriteLine("Ничего не найдено.");
+            Console.WriteLine("Библиотека пуста.");
             return;
         }
 
-        Console.WriteLine("Книги:");
-        foreach (var b in list)
-            Console.WriteLine(b.ToString());
+        foreach (var b in _books)
+            Console.WriteLine(b);
     }
 
-    /// Поиск с частичным совпадением по Title/Author/ISBN и полным совпадением по Year.
-    /// Пустые или null параметры игнорируются.
-    public IEnumerable<Book> Search(string? titlePart = null,
-                                    string? authorPart = null,
-                                    string? isbnPart = null,
-                                    string? yearExact = null)
+    public bool RemoveBook(string isbn)
     {
-        titlePart  = string.IsNullOrWhiteSpace(titlePart)  ? null : titlePart.Trim();
-        authorPart = string.IsNullOrWhiteSpace(authorPart) ? null : authorPart.Trim();
-        isbnPart   = string.IsNullOrWhiteSpace(isbnPart)   ? null : isbnPart.Trim();
-        yearExact  = string.IsNullOrWhiteSpace(yearExact)  ? null : yearExact.Trim();
-
-        return _books.Where(b =>
-            (titlePart is null  || (b.Title  ?? string.Empty).Contains(titlePart,  StringComparison.OrdinalIgnoreCase)) &&
-            (authorPart is null || (b.Author ?? string.Empty).Contains(authorPart, StringComparison.OrdinalIgnoreCase)) &&
-            (isbnPart is null   || (b.Isbn   ?? string.Empty).Contains(isbnPart,   StringComparison.OrdinalIgnoreCase)) &&
-            (yearExact is null  || string.Equals(b.Year, yearExact, StringComparison.Ordinal))
-        );
+        var book = _books.FirstOrDefault(b => b.Isbn == isbn);
+        if (book != null)
+        {
+            _books.Remove(book);
+            return true;
+        }
+        return false;
     }
 
-    public Book? FindByIsbn(string isbn) =>
-        _books.FirstOrDefault(b => string.Equals(b.Isbn, isbn, StringComparison.OrdinalIgnoreCase));
+    public Book FindByIsbn(string isbn)
+    {
+        return _books.FirstOrDefault(b => b.Isbn == isbn);
+    }
+
+    public List<Book> FindByTitle(string title)
+    {
+        var result = new List<Book>();
+        foreach (var b in _books)
+            if (b.Title.Contains(title, StringComparison.OrdinalIgnoreCase))
+                result.Add(b);
+        return result;
+    }
+
+    public List<Book> FindByAuthor(string author)
+    {
+        var result = new List<Book>();
+        foreach (var b in _books)
+            if (b.Author.Contains(author, StringComparison.OrdinalIgnoreCase))
+                result.Add(b);
+        return result;
+    }
+
+    public List<Book> FindByYear(string year)
+    {
+        var result = new List<Book>();
+        foreach (var b in _books)
+            if (b.Year == year)
+                result.Add(b);
+        return result;
+    }
+
+    // Сохранение и загрузка
+    public void SaveToFile(string path)
+    {
+        var json = JsonSerializer.Serialize(_books, new JsonSerializerOptions { WriteIndented = true });
+        System.IO.File.WriteAllText(path, json);
+        Console.WriteLine("Сохранено.");
+    }
+
+    public void LoadFromFile(string path)
+    {
+        if (!System.IO.File.Exists(path))
+        {
+            Console.WriteLine("Файл не найден.");
+            return;
+        }
+
+        var json = System.IO.File.ReadAllText(path);
+        var data = JsonSerializer.Deserialize<List<Book>>(json);
+        _books.Clear();
+        if (data != null) _books.AddRange(data);
+        Console.WriteLine("Загружено.");
+    }
 }
